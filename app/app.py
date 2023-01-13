@@ -45,6 +45,9 @@ def hello():
             return "".join("(" + preprocess_single(cs) + ")" for cs in curve_str.split(","))
             
         curve_msg = messages.Poly.from_string(preprocess(curve_str))
+        for v in curve_msg.vars():
+            if not v in {"x", "y"}:
+                raise messages.ParseError()
         
         curve_mj = curve_msg.to_mathjax()
         curve_disp = r"\[" + curve_mj + r" = 0\]"

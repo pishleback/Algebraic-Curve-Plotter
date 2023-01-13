@@ -158,6 +158,8 @@ class Poly(Message):
                                 break
                             power += letter
                             idx += 1
+                        if len(power) == 0:
+                            raise ParseError()
                         acc_prod = acc_prod * factor ** int(power)
                     else:
                         acc_prod = acc_prod * factor

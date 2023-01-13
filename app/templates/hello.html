@@ -43,7 +43,15 @@
 	</form>
 	<p>
 	
-	<div style="display:flex; position:relative; justify-content:space-evenly;">
+	<style>
+	@media (max-width: 900px) {
+		#affine-and-projective-cards {
+			flex-wrap:wrap;
+		}
+	}
+	</style>
+	
+	<div id="affine-and-projective-cards" style="display:flex; position:relative; justify-content:space-evenly;">
 		<div class="w3-card-4 w3-blue">
 			<h2 class="w3-container w3-center">Affine Plane \(\mathbb{A}_\mathbb{R}^2\)</h2>
 			<div>
