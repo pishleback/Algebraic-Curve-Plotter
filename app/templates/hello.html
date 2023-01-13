@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<meta charset="UTF-8">
+<title>Page Title</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="stylesheet" href="https://www.w3schools.com/w3css/4/w3.css"> 
+
+<head>
+  {{ turbo() }}
+</head>
+
+<body>
+<title>Algebraic Curve Grapher</title>
+<h1 class="w3-center">Algebraic Curve Grapher</h1>
+
+<script type="text/javascript" id="MathJax-script" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+<turbo-frame id="ec_params">
+	<form class="w3-container w3-light-grey" action="{{ url_for('hello') }}" method="post"> <!-- set data-turbo="false" to dissable turbo loading-->
+		<p>
+		<h2>Inputs</h2>
+		<p>Enter a smooth cubic curve and coordinates of a base point.</p>
+		<label class="w3-container w3-center">Curve
+		<input id="curve-input" 
+			   class="w3-input w3-border"
+			   style="text-align:center;"
+			   type="text" 
+			   name="curve" 
+			   autocomplete="off"
+			   onchange="this.form.requestSubmit()"
+			   value = "{{ curve_input }}">
+		</label>
+		{% if curve_disp %}
+			{{ curve_disp }}
+		{% else %}
+			<div class="w3-panel w3-red">
+			    <h3>Invalid Curve!</h3>
+				<p>The curve should be a polynomial in \(x\) and \(y\).</p>
+			</div>  
+		{% endif %}
+		<script>MathJax.typeset()</script>
+		<p>
+	</form>
+	<p>
+	
+	<div style="display:flex; position:relative; justify-content:space-evenly;">
+		<div class="w3-card-4 w3-blue">
+			<h2 class="w3-container w3-center">Affine Plane \(\mathbb{A}_\mathbb{R}^2\)</h2>
+			<div>
+				<canvas class="w3-container" id="myCanvas" width=1200 height=1200 style="max-width:100%;"/>
+			</div>
+			<p class="w3-container">Mousewheel to move around.</p>
+		</div> 
+		<div class="w3-card-4 w3-blue">
+			<h2 class="w3-container w3-center">Projective Plane \(\mathbb{P}_\mathbb{R}^2\)</h2>
+			<div>
+				<canvas class="w3-container" id="myCanvasSphere" width=1200 height=1200 style="max-width:100%;"/>
+			</div>
+			<p class="w3-container">Click and drag to move around.</p>
+		</div> 
+	</div> 
+	
+
+	
+	<script src="{{ url_for('static', filename='regl_compiled.js') }}"></script>
+	<script>
+	window.run_canvas(document.getElementById('myCanvas'), {{ curve_glsls | tojson }});
+	window.run_canvas_sphere(document.getElementById('myCanvasSphere'), {{ curve_glsls | tojson }});
+	</script>
+	
+	<p>
+	
+</turbo-frame id="ec_params">
+</body>
+
+</html>
