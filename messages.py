@@ -249,6 +249,9 @@ class Poly(Message):
         def degree(self):
             return sum(p for v, p in self.powers.items())
 
+        def is_zero(self):
+            return self.coeff.frac == 0
+
     @classmethod
     def zero(cls):
         return cls([])
@@ -269,6 +272,7 @@ class Poly(Message):
                     break
             else:
                 self.terms.append(term)
+        self.terms = [term for term in self.terms if not term.is_zero()]
 
     def __add__(self, other):
         if (cls := type(self)) == type(other):
@@ -302,12 +306,16 @@ class Poly(Message):
         return ans
 
     def to_mathjax(self):
+        if self.is_zero():
+            return "0"
         mj = "".join(term.to_mathjax() for term in self.terms)
         if mj[0] == "+":
             mj = mj[1:]
         return mj
 
     def to_glsl(self, var_names):
+        if self.is_zero():
+            return "0.0"
         return "+".join(term.to_glsl(var_names) for term in self.terms)
         
     def to_json(self):
@@ -324,6 +332,9 @@ class Poly(Message):
 
     def degree(self):
         return max(term.degree() for term in self.terms)
+
+    def is_zero(self):
+        return len(self.terms) == 0
 
     def homogenize(self, v):
         d = self.degree()

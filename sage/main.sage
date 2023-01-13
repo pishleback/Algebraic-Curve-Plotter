@@ -22,32 +22,42 @@ socket.bind("tcp://0.0.0.0:5555")
 #print(0 * P)
 
 
+class ErrorMessage(Exception):
+	pass
+
+
 while True:
 	try:
 		request_msg = json.loads(socket.recv().decode("utf-8"))
 		poly_msg = messages.Poly.from_json(request_msg["polynomial"])
 		var_strs = list(poly_msg.vars())
-		R = QQ[", ".join(var_strs)]
-				
-		var_sage = R.gens()	
-		def convert_frac(frac):
-			return Integer(frac.numerator) / Integer(frac.denominator)
-		poly_sage = poly_msg.eval({v_str : v_sage for v_str, v_sage in zip(var_strs, var_sage)}, convert_frac = convert_frac)
-		
-		def sage_poly_to_msg_poly(poly_sage):
-			#poly_dict contains {(v1_pow : int, v2_pow : int, ..., vn_pow : int) : coeff}
-			poly_dict = poly_sage.dict()
-			#handle univariate and multivariate seperately, becasue.dict returns different things
-			if len(var_sage) == 1:
-				poly_dict = {(power,) : coeff for power, coeff in poly_dict.items()}
-			else:
+		if poly_msg.is_zero():
+			raise ErrorMessage("The polynomial should be non-zero")
+		elif len(var_strs) == 0:
+			reply_msg = {"status" : "good", "factors" : []}
+		else:
+			R = QQ[", ".join(var_strs)]
+					
+			var_sage = R.gens()	
+			def convert_frac(frac):
+				return Integer(frac.numerator) / Integer(frac.denominator)
+			poly_sage = poly_msg.eval({v_str : v_sage for v_str, v_sage in zip(var_strs, var_sage)}, convert_frac = convert_frac)
+			
+			def sage_poly_to_msg_poly(poly_sage):
+				#poly_dict contains {(v1_pow : int, v2_pow : int, ..., vn_pow : int) : coeff}
 				poly_dict = poly_sage.dict()
-			return messages.Poly([messages.Poly.Term(messages.Rational(fractions.Fraction(int(val.numerator()), int(val.denominator()))), {v : k for v, k in zip(var_strs, key)}) for key, val in poly_dict.items()])
-		
-		factors = poly_sage.factor()
-		reply_msg = {"status" : "good", "factors" : [{"prime" : sage_poly_to_msg_poly(factors[i][0]).to_json(), "power" : int(factors[i][1])} for i in range(len(factors))]}
+				#handle univariate and multivariate seperately, becasue.dict returns different things
+				if len(var_sage) == 1:
+					poly_dict = {(power,) : coeff for power, coeff in poly_dict.items()}
+				else:
+					poly_dict = poly_sage.dict()
+				return messages.Poly([messages.Poly.Term(messages.Rational(fractions.Fraction(int(val.numerator()), int(val.denominator()))), {v : k for v, k in zip(var_strs, key)}) for key, val in poly_dict.items()])
+			
+			factors = poly_sage.factor()
+			reply_msg = {"status" : "good", "factors" : [{"prime" : sage_poly_to_msg_poly(factors[i][0]).to_json(), "power" : int(factors[i][1])} for i in range(len(factors))]}
+	except ErrorMessage as e:
+		socket.send(json.dumps({"status" : "error_message", "message" : str(e), "traceback" : traceback.format_exc()}).encode("utf-8"))
 	except Exception as e:
-		print(e)
-		socket.send(json.dumps({"status" : "error", "traceback" : traceback.format_exc()}).encode("utf-8"))
+		socket.send(json.dumps({"status" : "fatal_error", "traceback" : traceback.format_exc()}).encode("utf-8"))
 	else:
 		socket.send(json.dumps(reply_msg).encode("utf-8"))

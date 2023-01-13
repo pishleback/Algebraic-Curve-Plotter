@@ -54,24 +54,27 @@ def hello():
         socket.send(json.dumps({"polynomial" : curve_msg.to_json()}).encode("utf-8"))
         msg = json.loads(socket.recv().decode("utf-8"))
 
-        if msg["status"] == "error":
+        if msg["status"] == "fatal_error":
             raise Exception("An error was raised by sage:\n\n" + msg["traceback"])
+        elif msg["status"] == "error_message":
+            raise messages.ParseError(msg["message"])
         assert msg["status"] == "good"
 
         factors = [(messages.Poly.from_json(factor["prime"]), factor["power"]) for factor in msg["factors"]]
         curve_glsls = [f[0].homogenize("z").to_glsl({"x" : "x", "y" : "y", "z" : "z"}) for f in factors]
 
-        print(factors)
-        
         curve_disp = ""
         curve_disp += r"\["
-        for factor, power in factors:
-            if factor.num_terms() == 1 or (len(factors) == 1 and power == 1):
-                curve_disp += factor.to_mathjax()
-            else:
-                curve_disp += r"\left(" + factor.to_mathjax() + r"\right)"
-            if power > 1:
-                curve_disp += "^{" + str(power) + r"}"
+        if len(factors) == 0:
+            curve_disp += "1"
+        else:
+            for factor, power in factors:
+                if factor.num_terms() == 1 or (len(factors) == 1 and power == 1):
+                    curve_disp += factor.to_mathjax()
+                else:
+                    curve_disp += r"\left(" + factor.to_mathjax() + r"\right)"
+                if power > 1:
+                    curve_disp += "^{" + str(power) + r"}"
         curve_disp += r"=0\]"
     
     except messages.ParseError:
