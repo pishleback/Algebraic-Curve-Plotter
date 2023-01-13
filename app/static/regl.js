@@ -15,11 +15,10 @@ const fs = require('fs');
 
 
 window.AffineCanvas = class {
-	constructor(canvas, curves_glsl) {
+	constructor(canvas) {
 		const affine_canvas = this;
 		this.canvas = canvas;
-		this.curves_glsl = curves_glsl;
-		const regl = regl_module({canvas: canvas, extensions: ['angle_instanced_arrays']})
+		this.regl = regl_module({canvas: canvas, extensions: ['angle_instanced_arrays']})
 		this.center = [0.000001, 0.000001]; //offset center to prevent glsl artifacts on grid lines
 		this.zoom = 200;
 		
@@ -50,7 +49,7 @@ window.AffineCanvas = class {
 			affine_canvas.center[1] += at_mouse_after[1] - at_mouse_before[1];
 		}
 		
-		var draw_grid = regl({
+		var draw_grid = this.regl({
 				vert: `
 				attribute vec2 u_pos;
 
@@ -83,8 +82,8 @@ window.AffineCanvas = class {
 		  
 		  uniforms: {
 			canvas_size: [canvas.width, canvas.height],
-			zoom: regl.prop('zoom'),
-			center: regl.prop('center')
+			zoom: this.regl.prop('zoom'),
+			center: this.regl.prop('center')
 		  },
 		  
 		  depth: {
@@ -94,8 +93,48 @@ window.AffineCanvas = class {
 		  count: 6
 		})
 		
+
+		this.regl.frame(function () {
+			affine_canvas.regl.clear({
+				color: [0, 0, 0, 0]
+			})
+				  
+			draw_grid({
+				zoom : affine_canvas.zoom,
+				center : affine_canvas.center,
+			})
+			
+			for (var i = 0; i < affine_canvas.draw_curves.length; i++) {
+				affine_canvas.draw_curves[i]({
+					zoom : affine_canvas.zoom,
+					center : affine_canvas.center
+				})
+			}
+		})
+	
+	}
+	
+	coord_to_pixels(coord) {
+		return [(this.canvas.width / 2) + (coord[0] - this.center[0]) * this.zoom, 
+		        (this.canvas.height / 2) - (coord[1] - this.center[1]) * this.zoom];
+	}
+	
+	pixels_to_coord(pixels) {
+		return [(pixels[0] - (this.canvas.width / 2)) / this.zoom + this.center[0], 
+			    ((this.canvas.height / 2) - pixels[1]) / this.zoom + this.center[1]];
+	}
+	
+	getMousePos(evt) {  
+		const bb = this.canvas.getBoundingClientRect();
+		const x = Math.floor( (event.clientX - bb.left) / bb.width * this.canvas.width );
+		const y = Math.floor( (event.clientY - bb.top) / bb.height * this.canvas.height );
+		return [x, y];
+	}
+	
+	update_curves (curves_glsl) {		
+		this.draw_curves = [];
 		for (var i = 0; i < curves_glsl.length; i++) {
-			this.draw_curves.push(regl({
+			this.draw_curves.push(this.regl({
 				vert: `
 				attribute vec2 u_pos;
 
@@ -139,9 +178,9 @@ window.AffineCanvas = class {
 				},
 
 				uniforms: {
-					canvas_size: [canvas.width, canvas.height],
-					zoom: regl.prop('zoom'),
-					center_coord: regl.prop('center')
+					canvas_size: [this.canvas.width, this.canvas.height],
+					zoom: this.regl.prop('zoom'),
+					center_coord: this.regl.prop('center')
 				},
 
 				depth: {
@@ -151,52 +190,14 @@ window.AffineCanvas = class {
 				count: 6
 			}))
 		}
-
-	
-		regl.frame(function () {
-			regl.clear({
-				color: [0, 0, 0, 0]
-			})
-				  
-			draw_grid({
-				zoom : affine_canvas.zoom,
-				center : affine_canvas.center,
-			})
-			
-			for (var i = 0; i < affine_canvas.draw_curves.length; i++) {
-				affine_canvas.draw_curves[i]({
-					zoom : affine_canvas.zoom,
-					center : affine_canvas.center
-				})
-			}
-		})
-	
-	}
-	
-	coord_to_pixels(coord) {
-		return [(this.canvas.width / 2) + (coord[0] - this.center[0]) * this.zoom, 
-		        (this.canvas.height / 2) - (coord[1] - this.center[1]) * this.zoom];
-	}
-	
-	pixels_to_coord(pixels) {
-		return [(pixels[0] - (this.canvas.width / 2)) / this.zoom + this.center[0], 
-			    ((this.canvas.height / 2) - pixels[1]) / this.zoom + this.center[1]];
-	}
-	
-	getMousePos(evt) {  
-		const bb = this.canvas.getBoundingClientRect();
-		const x = Math.floor( (event.clientX - bb.left) / bb.width * this.canvas.width );
-		const y = Math.floor( (event.clientY - bb.top) / bb.height * this.canvas.height );
-		return [x, y];
 	}
 }
 
 window.ProjectiveCanvas = class {
-	constructor(canvas, curves_glsl) {
+	constructor(canvas) {
 		const projective_canvas = this;
 		this.canvas = canvas;
-		this.curves_glsl = curves_glsl;
-		const regl = regl_module({canvas: canvas, extensions: ['angle_instanced_arrays']})
+		this.regl = regl_module({canvas: canvas, extensions: ['angle_instanced_arrays']})
 		var Quaternion = require('quaternion');
 		this.angle = Quaternion(1, 0, 0, 0);	//represent the rotation of the projective plane using a unit quaternion
 		
@@ -215,7 +216,7 @@ window.ProjectiveCanvas = class {
 			}
 		})
 	
-		var draw_grid = regl({
+		var draw_grid = this.regl({
 			vert: `
 			attribute vec2 u_pos;
 			varying highp vec2 pos;
@@ -237,10 +238,9 @@ window.ProjectiveCanvas = class {
 			
 				s_pos = angle * s_pos;
 			
-				if ((abs(mod(s_pos.x / s_pos.z + 0.5, 1.0) - 0.5) < 0.005 / abs(s_pos.z)) || (abs(mod(s_pos.y / s_pos.z + 0.5, 1.0) - 0.5) < 0.005 / abs(s_pos.z))) {
-					gl_FragColor = vec4(0.8, 0.8, 0.8, 1);
-					//highp float val = 1.0 - max(tanh(log(abs(s_pos.z)) / 6.0), 0.0);
-					//gl_FragColor = vec4(val, val, val, 1);
+				if ((abs(mod(s_pos.x / s_pos.z + 0.5, 1.0) - 0.5) < 0.003 / abs(s_pos.z)) || (abs(mod(s_pos.y / s_pos.z + 0.5, 1.0) - 0.5) < 0.003 / abs(s_pos.z))) {
+					highp float val = 1.0-0.8*abs(s_pos.z);
+					gl_FragColor = vec4(val, val, val, 1);
 				} else {
 					gl_FragColor = vec4(1, 1, 1, 1);
 				}
@@ -253,7 +253,7 @@ window.ProjectiveCanvas = class {
 		  
 			uniforms: {
 				canvas_size: [canvas.width, canvas.height],
-				angle: regl.prop('angle'),
+				angle: this.regl.prop('angle'),
 			},
 		  
 			depth: {
@@ -262,10 +262,28 @@ window.ProjectiveCanvas = class {
 
 			count: 6
 		})
-		
-		
+
+		this.regl.frame(function () {
+			projective_canvas.regl.clear({
+				color: [0, 0, 0, 0]
+			})
+				  
+			draw_grid({
+				angle : projective_canvas.angle.toMatrix(),
+			})
+			
+			for (var i = 0; i < projective_canvas.draw_curves.length; i++) {
+				projective_canvas.draw_curves[i]({
+					angle : projective_canvas.angle.toMatrix()
+				})
+			}
+		})
+	}
+	
+	update_curves (curves_glsl) {		
+		this.draw_curves = [];
 		for (var i = 0; i < curves_glsl.length; i++) {
-			this.draw_curves.push(regl({
+			this.draw_curves.push(this.regl({
 					vert: `
 					attribute vec2 u_pos;
 					varying highp vec2 pos;
@@ -330,8 +348,8 @@ window.ProjectiveCanvas = class {
 				},
 
 				uniforms: {
-				canvas_size: [canvas.width, canvas.height],
-				angle: regl.prop('angle'),
+				canvas_size: [this.canvas.width, this.canvas.height],
+				angle: this.regl.prop('angle'),
 				},
 
 				depth: {
@@ -341,207 +359,5 @@ window.ProjectiveCanvas = class {
 				count: 6
 			}))
 		}
-
-	
-		regl.frame(function () {
-			regl.clear({
-				color: [0, 0, 0, 0]
-			})
-				  
-			draw_grid({
-				angle : projective_canvas.angle.toMatrix(),
-			})
-			
-			for (var i = 0; i < projective_canvas.draw_curves.length; i++) {
-				projective_canvas.draw_curves[i]({
-					angle : projective_canvas.angle.toMatrix()
-				})
-			}
-		})
 	}
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-window.run_canvas_sphere = function (canvas, curves_glsl) {
-	var Quaternion = require('quaternion');
-	const regl = regl_module({canvas: canvas, extensions: ['angle_instanced_arrays']})
-	//const camera = require('canvas-orbit-camera')(canvas)
-	//window.addEventListener('resize', fit(canvas), false)
-	
-	var angle = Quaternion(1, 0, 0, 0);	//represent the rotation of the projective plane using a unit quaternion
-	
-	
-	addEventListener('mousemove', (event) => {
-		if (event.target == canvas && (event.buttons & 1)) { //click and drag within the canvas	
-			//idk why i=y and j=x but thats just how it do be
-			di = Math.tanh(event.movementY / 100)/2	
-			dj = Math.tanh(event.movementX / 100)/2
-			dk = 0
-			dr = Math.sqrt(1-di*di-dj*dj-dk*dk);
-			d_angle = Quaternion(dr, di, dj, dk);
-			angle = d_angle.mul(angle);
-			angle = angle.normalize();		
-		}
-	})
-	
-	draw_sphere = regl({
-	  vert: `
-	  attribute vec2 u_pos;
-	  varying highp vec2 pos;
-	  
-	  void main () {
-		pos = u_pos;
-		gl_Position = vec4(u_pos, 0, 1);
-	  }`,
-	  
-	  frag: fs.readFileSync(__dirname + "/funcs.glsl", "utf8") + `
-	  varying highp vec2 pos;
-	  uniform highp mat3 angle;
-	  
-	  void main () {
-		highp vec3 s_pos = circle_to_pp_stereographic(pos);
-		if (s_pos.x == 0.0 && s_pos.y == 0.0 && s_pos.z == 0.0) {
-			discard;
-		}
-		
-		s_pos = angle * s_pos;
-		
-		if ((abs(mod(s_pos.x / s_pos.z + 0.5, 1.0) - 0.5) < 0.005 / abs(s_pos.z)) || (abs(mod(s_pos.y / s_pos.z + 0.5, 1.0) - 0.5) < 0.005 / abs(s_pos.z))) {
-			gl_FragColor = vec4(0.8, 0.8, 0.8, 1);
-			//highp float val = 1.0 - max(tanh(log(abs(s_pos.z)) / 6.0), 0.0);
-			//gl_FragColor = vec4(val, val, val, 1);
-		} else {
-			gl_FragColor = vec4(1, 1, 1, 1);
-		}
-			
-	  }`,
-
-	  attributes: {
-		u_pos: [[1, 1], [1, -1], [-1, -1], [1, 1], [-1, 1], [-1, -1]]
-	  },
-	  
-	  uniforms: {
-		canvas_size: [canvas.width, canvas.height],
-		angle: regl.prop('angle'),
-	  },
-	  
-	  depth: {
-		  enable: false
-	  },
-
-	  count: 6
-	})
-	
-	drawers = [];
-	for (var i = 0; i < curves_glsl.length; i++) {
-		drawers.push(regl({
-				vert: `
-				attribute vec2 u_pos;
-				varying highp vec2 pos;
-
-				void main () {
-				pos = u_pos;
-				gl_Position = vec4(u_pos, 0, 1);
-				}`,
-
-				frag: fs.readFileSync(__dirname + "/funcs.glsl", "utf8") + `	  
-				varying highp vec2 pos;
-				uniform highp mat3 angle;
-
-				highp float func(highp vec3 v) {
-				  highp float x = v.x;
-				  highp float y = v.y;
-				  highp float z = v.z;
-				  return ` + curves_glsl[i] + `;
-				}
-
-				void main () {
-				highp vec3 s_pos = circle_to_pp_stereographic(pos);
-				if (s_pos.x == 0.0 && s_pos.y == 0.0 && s_pos.z == 0.0) {
-					discard;
-				}
-				
-				s_pos = angle * s_pos;
-				
-				int count = 0;
-				if (s_pos.x < 0.0) {
-					count += 1;
-				}
-				if (s_pos.y < 0.0) {
-					count += 1;
-				}
-				if (s_pos.z < 0.0) {
-					count += 1;
-				}
-				
-				highp vec3 S = get_perp(s_pos);
-				highp vec3 T = cross(S, s_pos);
-				
-				int neg_count = 0;
-				highp float a;
-				for (int i = 0; i < 5; i++) {
-					a = pi*float(i)/2.5;
-					if (func(s_pos + cos(a) * S / 150.0 + sin(a) * T / 150.0) < 0.0) {
-						neg_count += 1;
-					}
-				}
-				
-				if (neg_count == 0 || neg_count == 5) {
-					discard;
-				} else {
-					gl_FragColor = vec4(1, 0, 0, 1);
-				}
-					
-			}`,
-
-			attributes: {
-			u_pos: [[1, 1], [1, -1], [-1, -1], [1, 1], [-1, 1], [-1, -1]]
-			},
-
-			uniforms: {
-			canvas_size: [canvas.width, canvas.height],
-			angle: regl.prop('angle'),
-			},
-
-			depth: {
-			  enable: false
-			},
-
-			count: 6
-		}))
-	}
-	
-
-	regl.frame(function () { 
-		regl.clear({
-			color: [0, 0, 0, 0]
-		})
-  
-		draw_sphere({
-			angle : angle.toMatrix()
-		})
-
-		for (var i = 0; i < drawers.length; i++) {
-			drawers[i]({
-				angle : angle.toMatrix()
-			})
-		}
-	})
 }

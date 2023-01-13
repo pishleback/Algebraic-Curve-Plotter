@@ -43,6 +43,22 @@
 			<p>
 		</div>
 	</form>
+	<script>
+	//wait for window.affine_canvas and window.projective_canvas to load, then set their curves
+	function update_curves() {
+		if ((typeof window.affine_canvas !== "undefined") && (typeof window.projective_canvas !== "undefined")){
+			window.affine_canvas.update_curves({{ curve_glsls | tojson }})
+			window.projective_canvas.update_curves({{ curve_glsls | tojson }})
+		} else {
+			setTimeout(update_curves, 250);
+		}
+	}
+	update_curves();
+	</script>
+</turbo-frame id="ec_params">
+
+
+
 
 <p>
 
@@ -76,15 +92,12 @@
 </div> 
 
 
-
 <script src="{{ url_for('static', filename='regl_compiled.js') }}"></script>
 <script>
-affine_canvas = new window.AffineCanvas(document.getElementById('affine-canvas'), {{ curve_glsls | tojson }});
-projective_canvas = new window.ProjectiveCanvas(document.getElementById('projective-canvas'), {{ curve_glsls | tojson }});
+window.affine_canvas = new window.AffineCanvas(document.getElementById('affine-canvas'));
+window.projective_canvas = new window.ProjectiveCanvas(document.getElementById('projective-canvas'));
 </script>
 
-
-</turbo-frame id="ec_params">
 
 </body>
 
