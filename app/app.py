@@ -31,6 +31,7 @@ def get_hit_count():
 @app.route('/index', methods = ["GET", "POST"])
 def hello():
     curve_str = flask.request.form.get("curve", "x^3 - 3x^2y - 3x^2 - 3xy^2 - 5xy - 3x + y^3 - 3y^2 - 3y + 1")
+    warnings = []
     try:
         def preprocess(curve_str):
             def preprocess_single(curve_str):
@@ -48,6 +49,9 @@ def hello():
         for v in curve_msg.vars():
             if not v in {"x", "y"}:
                 raise messages.ParseError()
+
+        if curve_msg.degree() > 20:
+            warnings.append("Polynomials of high degree may not render correctly.")
         
         curve_mj = curve_msg.to_mathjax()
         curve_disp = r"\[" + curve_mj + r" = 0\]"
@@ -88,6 +92,7 @@ def hello():
                                 count = get_hit_count(),
                                 curve_input = curve_str,
                                 curve_disp = curve_disp,
+                                warnings = warnings,
                                 curve_glsls = curve_glsls)
     return ans
 

@@ -35,10 +35,17 @@
 				{{ curve_disp }}
 			{% else %}
 				<div class="w3-panel w3-red">
-					<h3>Invalid Curve!</h3>
-					<p>Should be a non-zero polynomial in \(x\) and \(y\).</p>
+					<h3>Error!</h3>
+					<p>Could not parse input. Should be a non-zero polynomial in \(x\) and \(y\).</p>
 				</div>  
 			{% endif %}
+			
+			{% for warning in warnings %}
+				<div class="w3-panel w3-yellow">
+					<h3>Warning!</h3>
+					<p>{{ warning }}</p>
+				</div> 
+			{% endfor %}
 			<script>MathJax.typeset()</script>
 			<p>
 		</div>
