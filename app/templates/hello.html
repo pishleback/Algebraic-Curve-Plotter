@@ -16,69 +16,76 @@
 <script type="text/javascript" id="MathJax-script" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
 
 <turbo-frame id="ec_params">
-	<form class="w3-container w3-light-grey" action="{{ url_for('hello') }}" method="post"> <!-- set data-turbo="false" to dissable turbo loading-->
-		<p>
-		<h2>Inputs</h2>
-		<p>Enter a smooth cubic curve and coordinates of a base point.</p>
-		<label class="w3-container w3-center">Curve
-		<input id="curve-input" 
-			   class="w3-input w3-border"
-			   style="text-align:center;"
-			   type="text" 
-			   name="curve" 
-			   autocomplete="off"
-			   onchange="this.form.requestSubmit()"
-			   value = "{{ curve_input }}">
-		</label>
-		{% if curve_disp %}
-			{{ curve_disp }}
-		{% else %}
-			<div class="w3-panel w3-red">
-			    <h3>Invalid Curve!</h3>
-				<p>Should be a non-zero polynomial in \(x\) and \(y\).</p>
-			</div>  
-		{% endif %}
-		<script>MathJax.typeset()</script>
-		<p>
+	<form action="{{ url_for('hello') }}" method="post"> <!-- set data-turbo="false" to dissable turbo loading-->
+		<div class="w3-container w3-light-grey">
+			<p>
+			<h2>Inputs</h2>
+			<p>Enter a smooth cubic curve and coordinates of a base point.</p>
+			<label class="w3-container w3-center">Curve
+			<input id="curve-input" 
+				   class="w3-input w3-border"
+				   style="text-align:center;"
+				   type="text" 
+				   name="curve" 
+				   autocomplete="off"
+				   onchange="this.form.requestSubmit()"
+				   value = "{{ curve_input }}">
+			</label>
+			{% if curve_disp %}
+				{{ curve_disp }}
+			{% else %}
+				<div class="w3-panel w3-red">
+					<h3>Invalid Curve!</h3>
+					<p>Should be a non-zero polynomial in \(x\) and \(y\).</p>
+				</div>  
+			{% endif %}
+			<script>MathJax.typeset()</script>
+			<p>
+		</div>
 	</form>
-	<p>
-	
-	<style>
-	@media (max-width: 900px) {
-		#affine-and-projective-cards {
-			flex-wrap:wrap;
-		}
-	}
-	</style>
-	
-	<div id="affine-and-projective-cards" style="display:flex; position:relative; justify-content:space-evenly;">
-		<div class="w3-card-4 w3-blue">
-			<h2 class="w3-container w3-center">Affine Plane \(\mathbb{A}_\mathbb{R}^2\)</h2>
-			<div>
-				<canvas class="w3-container" id="myCanvas" width=1200 height=1200 style="max-width:100%;"/>
-			</div>
-			<p class="w3-container">Mousewheel to move around.</p>
-		</div> 
-		<div class="w3-card-4 w3-blue">
-			<h2 class="w3-container w3-center">Projective Plane \(\mathbb{P}_\mathbb{R}^2\)</h2>
-			<div>
-				<canvas class="w3-container" id="myCanvasSphere" width=1200 height=1200 style="max-width:100%;"/>
-			</div>
-			<p class="w3-container">Click and drag to move around.</p>
-		</div> 
-	</div> 
-	
 
-	
-	<script src="{{ url_for('static', filename='regl_compiled.js') }}"></script>
-	<script>
-	window.run_canvas(document.getElementById('myCanvas'), {{ curve_glsls | tojson }});
-	window.run_canvas_sphere(document.getElementById('myCanvasSphere'), {{ curve_glsls | tojson }});
-	</script>
-	
-	<p>
-	
+<p>
+
+<style>
+@media (max-width: 900px) {
+	#affine-and-projective-cards {
+		flex-wrap:wrap;
+	}
+}
+</style>
+
+<div id="affine-and-projective-cards" style="display:flex; position:relative; justify-content:space-evenly;">
+	<div class="w3-card-4 w3-blue">
+		<h2 class="w3-container w3-center">Affine Plane \(\mathbb{A}_\mathbb{R}^2\)</h2>
+		<div>
+			<canvas class="w3-container" id="affine-canvas" width=1200 height=1200 style="max-width:100%;"/>
+		</div>
+		<p class="w3-container">Mousewheel to move around.</p>
+	</div> 
+	<div class="w3-card-4 w3-blue">
+		<h2 class="w3-container w3-center">Projective Plane \(\mathbb{P}_\mathbb{R}^2\)</h2>
+		<div>
+			<canvas class="w3-container" id="projective-canvas" width=1200 height=1200 style="max-width:100%;"/>
+		</div>
+		<p class="w3-container">Click and drag to move around.</p>
+		<form action="" method="post">
+			<input type="radio" name="projection-type" value="projection-type-stereographic" checked="checked">Stereographic</input>
+			<input type="radio" name="projection-type" value="projection-type-orthogonal">Orthogonal</input>
+		</form>
+	</div> 
+</div> 
+
+
+
+<script src="{{ url_for('static', filename='regl_compiled.js') }}"></script>
+<script>
+affine_canvas = new window.AffineCanvas(document.getElementById('affine-canvas'), {{ curve_glsls | tojson }});
+projective_canvas = new window.ProjectiveCanvas(document.getElementById('projective-canvas'), {{ curve_glsls | tojson }});
+</script>
+
+
 </turbo-frame id="ec_params">
+
 </body>
 
 </html>
