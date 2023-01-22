@@ -14,22 +14,74 @@ const fs = require('fs');
 
 
 
-window.AffineCanvas = class {
+PlaneCanvas = class {
 	constructor(canvas) {
-		const affine_canvas = this;
 		this.canvas = canvas;
+		this.mouse_projective_pos = [0, 0, 0];
+	}
+	
+	get_draw_points() {
+		if (this.mouse_projective_pos != [0, 0, 0]) {
+			return [{"point" : this.mouse_projective_pos, "radius" : 1, "colour" : [0, 0, 0, 1]}];
+		} else {
+			return [];
+		}
+	}
+	
+	get_mouse_pos_pixels(evt) {  
+		const bb = this.canvas.getBoundingClientRect();
+		const x = Math.floor( (event.clientX - bb.left) / bb.width * this.canvas.width );
+		const y = Math.floor( this.canvas.height - (event.clientY - bb.top) / bb.height * this.canvas.height );
+		return [x, y];
+	}
+	
+	pixels_to_projective(pixels) {  
+		throw new Error("Not Implemented");
+	}
+	
+	update_mousepos(mouse_pos) {
+		this.mouse_projective_pos = mouse_pos;
+		
+		/*
+		return;
+		
+		//for snapping to the graph:
+		
+		var oop = function (x, y, z) {
+			return Math.pow(x*x+y*y-z*z, 2);
+		}
+		
+		var pt = mouse_pos;
+						
+		for (var j = 0; j < 100; j += 1) {
+			var d = 0.001;
+			var dv = [(oop(pt[0]+d, pt[1], pt[2]) - oop(pt[0]-d, pt[1], pt[2])) / (2 * d),
+					  (oop(pt[0], pt[1]+d, pt[2]) - oop(pt[0], pt[1]-d, pt[2])) / (2 * d),
+					  (oop(pt[0], pt[1], pt[2]+d) - oop(pt[0], pt[1], pt[2]-d)) / (2 * d)];
+					  
+			var len = Math.sqrt(dv[0]*dv[0] + dv[1]*dv[1] + dv[1]*dv[1]);
+			pt = [pt[0] - dv[0] / (1000*len), pt[1] - dv[1] / (1000*len), pt[2] - dv[2] / (1000*len)];
+			var len = Math.sqrt(pt[0]*pt[0] + pt[1]*pt[1] + pt[1]*pt[1]);
+			pt = [pt[0] / len, pt[1] / len, pt[2] / len];
+		}
+						
+		this.mouse_projective_pos = pt;
+		*/
+	}
+		
+}
+
+
+window.AffineCanvas = class extends PlaneCanvas {
+	constructor(canvas) {
+		super(canvas);
+		
+		const affine_canvas = this;
 		this.regl = regl_module({canvas: canvas, extensions: ['angle_instanced_arrays']})
 		this.center = [0.000001, 0.000001]; //offset center to prevent glsl artifacts on grid lines
-		this.zoom = 200;
+		this.zoom = 6;
 		
 		this.draw_curves = [];
-		
-		this.canvas.onclick = function (event) {
-			var mouse_pos = affine_canvas.getMousePos(affine_canvas.canvas, event)
-			console.log(mouse_pos);
-			console.log(affine_canvas.pixels_to_coord(mouse_pos));
-			console.log(affine_canvas.coord_to_pixels(affine_canvas.pixels_to_coord(mouse_pos)));
-		}
 
 		this.canvas.onmousewheel = function(event){
 			event.preventDefault();
@@ -37,16 +89,16 @@ window.AffineCanvas = class {
 
 		this.canvas.onwheel = function (event) {
 			event.preventDefault();	
-			var at_mouse_before = affine_canvas.pixels_to_coord(affine_canvas.getMousePos(affine_canvas.canvas, event))
-			affine_canvas.zoom *= Math.pow(1.001, -event.deltaY);
-			if (affine_canvas.zoom < 0.1) {
-				affine_canvas.zoom = 0.1;
-			} else if (affine_canvas.zoom > 10000) {
-				affine_canvas.zoom = 10000;
+			var at_mouse_before = affine_canvas.pixels_to_coord(affine_canvas.get_mouse_pos_pixels(affine_canvas.canvas, event))
+			affine_canvas.zoom *= Math.pow(0.999, -event.deltaY);
+			if (affine_canvas.zoom < 0.01) {
+				affine_canvas.zoom = 0.01;
+			} else if (affine_canvas.zoom > 1000) {
+				affine_canvas.zoom = 1000;
 			}
-			var at_mouse_after = affine_canvas.pixels_to_coord(affine_canvas.getMousePos(affine_canvas.canvas, event));
-			affine_canvas.center[0] += at_mouse_after[0] - at_mouse_before[0];
-			affine_canvas.center[1] += at_mouse_after[1] - at_mouse_before[1];
+			var at_mouse_after = affine_canvas.pixels_to_coord(affine_canvas.get_mouse_pos_pixels(affine_canvas.canvas, event));
+			affine_canvas.center[0] += at_mouse_before[0] - at_mouse_after[0];
+			affine_canvas.center[1] += at_mouse_before[1] - at_mouse_after[1];
 		}
 		
 		var draw_grid = this.regl({
@@ -54,27 +106,28 @@ window.AffineCanvas = class {
 				attribute vec2 u_pos;
 
 				varying highp vec2 coord;
-				uniform vec2 canvas_size;
-				uniform vec2 center;
+				uniform highp vec2 canvas_size;
+				uniform highp vec2 center;
 				uniform highp float zoom;
 
 				void main () {
-				gl_Position = vec4(u_pos, 0, 1);
-				coord = (canvas_size*u_pos/2.0)/zoom-center;
+					gl_Position = vec4(u_pos, 0, 1);
+					coord = center+zoom*u_pos/2.0;
 				}`,
 
 				frag: fs.readFileSync(__dirname + "/funcs.glsl", "utf8") + `
 				varying highp vec2 coord;
 				uniform highp float zoom;
+				uniform highp vec2 canvas_size;
 
 				void main () {
-				if (abs(mod(coord.x + 0.5, 1.0) - 0.5) < 0.5/zoom || abs(mod(coord.y + 0.5, 1.0) - 0.5) < 0.5/zoom) {
-					highp float val = 1.0 - max(tanh(log(zoom) / 6.0), 0.0);
-					gl_FragColor = vec4(val, val, val, 1);
-				} else {
-					gl_FragColor = vec4(1, 1, 1, 1);
-				}
-			}`,
+					if (abs(mod(coord.x + 0.5, 1.0) - 0.5) < 0.5 * zoom / canvas_size.x || abs(mod(coord.y + 0.5, 1.0) - 0.5) < 0.5 * zoom / canvas_size.y) {
+						highp float val = 1.0 - max(tanh(log(sqrt(canvas_size.x * canvas_size.y) / zoom) / 6.0), 0.0);
+						gl_FragColor = vec4(val, val, val, 1);
+					} else {
+						gl_FragColor = vec4(1, 1, 1, 1);
+					}
+				}`,
 
 		  attributes: {
 			u_pos: [[1, 1], [1, -1], [-1, -1], [1, 1], [-1, 1], [-1, -1]]
@@ -93,6 +146,63 @@ window.AffineCanvas = class {
 		  count: 6
 		})
 		
+		
+		var point_drawer = this.regl({
+				vert: `
+				attribute vec2 u_pos;
+
+				uniform highp vec2 canvas_size;
+				uniform highp vec2 center;
+				uniform highp float zoom;
+				uniform highp vec3 point;
+				uniform highp float radius;
+
+				void main () {
+					highp vec2 point_tmp1 = vec2(point.x / point.z, point.y / point.z);
+					highp vec2 point_tmp2 = 2.0 * (point_tmp1 - center) / zoom;
+					gl_Position = vec4(point_tmp2 + radius * u_pos / 100.0, 0, 1);
+				}`,
+
+				frag: fs.readFileSync(__dirname + "/funcs.glsl", "utf8") + `				
+				uniform highp vec4 colour;
+
+				void main () {
+					gl_FragColor = colour;
+				}`,
+
+		  attributes: {
+			u_pos: [[0, 0], [0.0, 1.0], [0.5, 0.866],
+			        [0, 0], [0.5, 0.866], [0.866, 0.5], 
+			        [0, 0], [0.866, 0.5], [1.0, 0.0],
+			        [0, 0], [1.0, 0.0], [0.866, -0.5],
+			        [0, 0], [0.866, -0.5], [0.5, -0.866],
+			        [0, 0], [0.5, -0.866], [0.0, -1.0], 
+			        [0, 0], [0.0, -1.0], [-0.5, -0.866],
+			        [0, 0], [-0.5, -0.866], [-0.866, -0.5],
+			        [0, 0], [-0.866, -0.5], [-1.0, -0.0], 
+			        [0, 0], [-1.0, -0.0], [-0.866, 0.5], 
+			        [0, 0], [-0.866, 0.5], [-0.5, 0.866],
+			        [0, 0], [-0.5, 0.866], [-0.0, 1.0]]
+		  },
+		  
+		  uniforms: {
+			canvas_size: [canvas.width, canvas.height],
+			zoom: this.regl.prop('zoom'),
+			center: this.regl.prop('center'),
+			point: this.regl.prop('point'),
+			radius: this.regl.prop('radius'),
+			colour: this.regl.prop('colour'),
+		  },
+		  
+		  depth: {
+			  enable: false
+		  },
+
+		  count: 36
+		})
+		
+		
+		
 
 		this.regl.frame(function () {
 			affine_canvas.regl.clear({
@@ -110,26 +220,37 @@ window.AffineCanvas = class {
 					center : affine_canvas.center
 				})
 			}
+			
+			var draw_points = affine_canvas.get_draw_points();
+			for (var i = 0; i < draw_points.length; i++) {
+				point_drawer({
+					zoom : affine_canvas.zoom,
+					center : affine_canvas.center,
+					point : draw_points[i].point,
+					radius : draw_points[i].radius,
+					colour : draw_points[i].colour
+				})
+			}
+			
 		})
 	
 	}
 	
 	coord_to_pixels(coord) {
-		return [(this.canvas.width / 2) + (coord[0] - this.center[0]) * this.zoom, 
-		        (this.canvas.height / 2) - (coord[1] - this.center[1]) * this.zoom];
+		return [(this.canvas.width / 2) + this.canvas.width * (coord[0] - this.center[0]) / this.zoom, 
+		        (this.canvas.height / 2) + this.canvas.height * (coord[1] - this.center[1]) / this.zoom];
 	}
 	
 	pixels_to_coord(pixels) {
-		return [(pixels[0] - (this.canvas.width / 2)) / this.zoom + this.center[0], 
-			    ((this.canvas.height / 2) - pixels[1]) / this.zoom + this.center[1]];
+		return [(pixels[0] - (this.canvas.width / 2)) * this.zoom / this.canvas.width + this.center[0], 
+			    (pixels[1] - (this.canvas.height / 2)) * this.zoom / this.canvas.height + this.center[1]];
 	}
 	
-	getMousePos(evt) {  
-		const bb = this.canvas.getBoundingClientRect();
-		const x = Math.floor( (event.clientX - bb.left) / bb.width * this.canvas.width );
-		const y = Math.floor( (event.clientY - bb.top) / bb.height * this.canvas.height );
-		return [x, y];
+	pixels_to_projective(pixels) {  
+		var coord = this.pixels_to_coord(pixels);
+		return [coord[0], coord[1], 1];
 	}
+
 	
 	update_curves (curves_glsl) {		
 		this.draw_curves = [];
@@ -139,38 +260,39 @@ window.AffineCanvas = class {
 				attribute vec2 u_pos;
 
 				varying highp vec2 coord;
-				uniform vec2 canvas_size;
-				uniform vec2 center_coord;
+				uniform highp vec2 canvas_size;
+				uniform highp vec2 center;
 				uniform highp float zoom;
 
 				void main () {
-				gl_Position = vec4(u_pos, 0, 1);
-				coord = (canvas_size*u_pos/2.0)/zoom-center_coord;
+					gl_Position = vec4(u_pos, 0, 1);
+					coord = center+zoom*u_pos/2.0;
 				}`,
 
 				frag: fs.readFileSync(__dirname + "/funcs.glsl", "utf8") + `
 				varying highp vec2 coord;
 				uniform highp float zoom;
+				uniform highp vec2 canvas_size;
 
 				highp float func(highp float x, highp float y, highp float z) {
 					return ` + curves_glsl[i] + `;
 				}
 
 				void main () {
-				int neg_count = 0;
-				highp float a;
-				for (int i = 0; i < 5; i++) {
-					a = pi*float(i)/2.5;
-					if (func(coord.x + 2.5 * sin(a) / zoom, coord.y + 2.5 * cos(a) / zoom, 1.0) < 0.0) {
-						neg_count += 1;
+					int neg_count = 0;
+					highp float a;
+					for (int i = 0; i < 5; i++) {
+						a = pi*float(i)/2.5;
+						if (func(coord.x + 2.5 * sin(a) * zoom / canvas_size.x, coord.y + 2.5 * cos(a) * zoom / canvas_size.y, 1.0) < 0.0) {
+							neg_count += 1;
+						}
 					}
-				}
-				  
-				if (neg_count == 0 || neg_count == 5) {
-					discard;
-				} else {
-					gl_FragColor = vec4(1, 0, 0, 1);
-				}
+					  
+					if (neg_count == 0 || neg_count == 5) {
+						discard;
+					} else {
+						gl_FragColor = vec4(1, 0, 0, 1);
+					}
 				}`,
 
 				attributes: {
@@ -180,7 +302,7 @@ window.AffineCanvas = class {
 				uniforms: {
 					canvas_size: [this.canvas.width, this.canvas.height],
 					zoom: this.regl.prop('zoom'),
-					center_coord: this.regl.prop('center')
+					center: this.regl.prop('center')
 				},
 
 				depth: {
@@ -193,10 +315,11 @@ window.AffineCanvas = class {
 	}
 }
 
-window.ProjectiveCanvas = class {
+window.ProjectiveCanvas = class extends PlaneCanvas {
 	constructor(canvas) {
+		super(canvas);
+		
 		const projective_canvas = this;
-		this.canvas = canvas;
 		this.regl = regl_module({canvas: canvas, extensions: ['angle_instanced_arrays']})
 		var Quaternion = require('quaternion');
 		this.angle = Quaternion(1, 0, 0, 0);	//represent the rotation of the projective plane using a unit quaternion
@@ -262,8 +385,63 @@ window.ProjectiveCanvas = class {
 
 			count: 6
 		})
+		
+		var point_drawer = this.regl({
+				vert: `
+				attribute vec2 u_pos;
 
-		this.regl.frame(function () {
+				uniform highp vec2 canvas_size;
+				uniform highp mat3 angle_inv;
+				uniform highp vec3 point;
+				uniform highp float radius;
+
+				void main () {
+					highp vec3 point_tmp1 = angle_inv * normalize(point);
+					if (point_tmp1.z < 0.0) {
+						point_tmp1 = -point_tmp1;
+					}
+					highp vec2 point_tmp2 = vec2(point_tmp1.x / (point_tmp1.z + 1.0), point_tmp1.y / (point_tmp1.z + 1.0));
+					gl_Position = vec4(point_tmp2 + radius * u_pos / 100.0, 0, 1);
+				}`,
+
+				frag: fs.readFileSync(__dirname + "/funcs.glsl", "utf8") + `				
+				uniform highp vec4 colour;
+
+				void main () {
+					gl_FragColor = colour;
+				}`,
+
+		  attributes: {
+			u_pos: [[0, 0], [0.0, 1.0], [0.5, 0.866],
+			        [0, 0], [0.5, 0.866], [0.866, 0.5], 
+			        [0, 0], [0.866, 0.5], [1.0, 0.0],
+			        [0, 0], [1.0, 0.0], [0.866, -0.5],
+			        [0, 0], [0.866, -0.5], [0.5, -0.866],
+			        [0, 0], [0.5, -0.866], [0.0, -1.0], 
+			        [0, 0], [0.0, -1.0], [-0.5, -0.866],
+			        [0, 0], [-0.5, -0.866], [-0.866, -0.5],
+			        [0, 0], [-0.866, -0.5], [-1.0, -0.0], 
+			        [0, 0], [-1.0, -0.0], [-0.866, 0.5], 
+			        [0, 0], [-0.866, 0.5], [-0.5, 0.866],
+			        [0, 0], [-0.5, 0.866], [-0.0, 1.0]]
+		  },
+		  
+		  uniforms: {
+			canvas_size: [canvas.width, canvas.height],
+			angle_inv: this.regl.prop('angle_inv'),
+			point: this.regl.prop('point'),
+			radius: this.regl.prop('radius'),
+			colour: this.regl.prop('colour'),
+		  },
+		  
+		  depth: {
+			  enable: false
+		  },
+
+		  count: 36
+		})
+
+		this.regl.frame(function () {			
 			projective_canvas.regl.clear({
 				color: [0, 0, 0, 0]
 			})
@@ -277,6 +455,17 @@ window.ProjectiveCanvas = class {
 					angle : projective_canvas.angle.toMatrix()
 				})
 			}
+			
+			var draw_points = projective_canvas.get_draw_points();
+			for (var i = 0; i < draw_points.length; i++) {
+				point_drawer({
+					angle_inv : projective_canvas.angle.inverse().toMatrix(),
+					point : draw_points[i].point,
+					radius : draw_points[i].radius,
+					colour : draw_points[i].colour
+				})
+			}
+			
 		})
 	}
 	
@@ -358,6 +547,64 @@ window.ProjectiveCanvas = class {
 
 				count: 6
 			}))
+		}
+	}
+	
+	pixels_to_projective(pixels) {
+		//this is for stereographic NOT orthogonal
+		var x = 2 * pixels[0] / this.canvas.width - 1;
+		var y = 2 * pixels[1] / this.canvas.height - 1;
+		if (x*x + y*y > 1.0) {
+			return [0, 0, 0];
+		}
+		var t = 2 / (x*x + y*y + 1);
+		return this.angle.inverse().rotateVector([x * t, y * t, t - 1]);
+	}
+}
+
+
+
+window.CanvasManager = class {
+	constructor(canvases) {
+		this.canvases = canvases;
+		const canvas_manager = this;
+		
+		addEventListener('mousemove', (event) => {
+			
+			var current_mouse_location = -1;
+			var in_some_canvas = false;
+			for (var i = 0; i < canvas_manager.canvases.length; i += 1) {
+				if (event.target == canvas_manager.canvases[i].canvas) {
+					current_mouse_location = i;
+					in_some_canvas = true;
+				}
+			}
+			
+						
+			if (in_some_canvas) {
+				canvas_manager.update_mousepos(
+					canvas_manager.canvases[current_mouse_location].pixels_to_projective(
+						canvas_manager.canvases[current_mouse_location].get_mouse_pos_pixels(event)
+					)
+				);
+			} else {
+				canvas_manager.update_mousepos([0, 0, 0]);
+			}
+			
+		
+		})
+	}
+	
+	update_mousepos(mouse_pos) {
+		// [0, 0, 0] for no mouse pos
+		for (var i = 0; i < this.canvases.length; i += 1) {
+			this.canvases[i].update_mousepos(mouse_pos);
+		}
+	}
+	
+	update_curves(curves_glsl) {
+		for (var i = 0; i < this.canvases.length; i += 1) {
+			this.canvases[i].update_curves(curves_glsl);
 		}
 	}
 }
