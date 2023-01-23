@@ -56,6 +56,7 @@
 	function update_curves() {
 		if (typeof window.canvas_manager !== "undefined"){
 			window.canvas_manager.update_curves({{ curve_glsls | tojson }})
+			window.canvas_manager.update_rational_pts({{ rational_pts | tojson }})
 		} else {
 			setTimeout(update_curves, 250);
 		}

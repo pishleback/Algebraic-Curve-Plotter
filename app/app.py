@@ -28,6 +28,7 @@ def get_hit_count():
             retries -= 1
             time.sleep(0.1)
 
+
 @app.route('/index', methods = ["GET", "POST"])
 def hello():
     curve_str = flask.request.form.get("curve", "x^3 - 3x^2y - 3x^2 - 3xy^2 - 5xy - 3x + y^3 - 3y^2 - 3y + 1")
@@ -67,8 +68,10 @@ def hello():
             raise messages.ParseError(msg["message"])
         assert msg["status"] == "good"
 
+
         factors = [(messages.Poly.from_json(factor["prime"]), factor["power"]) for factor in msg["factors"]]
         curve_glsls = [f[0].homogenize("z").to_glsl({"x" : "x", "y" : "y", "z" : "z"}) for f in factors]
+        rational_pts = [[float(messages.Rational.from_json(pt[i]).to_frac()) for i in range(3)] for pt in msg["rational_points"]]
 
         curve_disp = ""
         curve_disp += r"\["
@@ -87,13 +90,15 @@ def hello():
     except messages.ParseError:
         curve_disp = None
         curve_glsls = []
+        rational_pts = []
     
     ans = flask.render_template('hello.html',
                                 count = get_hit_count(),
                                 curve_input = curve_str,
                                 curve_disp = curve_disp,
                                 warnings = warnings,
-                                curve_glsls = curve_glsls)
+                                curve_glsls = curve_glsls,
+                                rational_pts = rational_pts)
     return ans
 
 

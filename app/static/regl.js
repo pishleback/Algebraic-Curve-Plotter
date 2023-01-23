@@ -18,14 +18,19 @@ PlaneCanvas = class {
 	constructor(canvas) {
 		this.canvas = canvas;
 		this.mouse_projective_pos = [0, 0, 0];
+		this.rational_pts = [];
 	}
 	
 	get_draw_points() {
-		if (this.mouse_projective_pos != [0, 0, 0]) {
-			return [{"point" : this.mouse_projective_pos, "radius" : 1, "colour" : [0, 0, 0, 1]}];
-		} else {
-			return [];
+		var draw_pts = []
+		for (var i = 0; i < this.rational_pts.length; i += 1) {
+			draw_pts.push({"point" : this.rational_pts[i], "radius" : 1, "colour" : [1, 0, 0, 1]});
+			draw_pts.push({"point" : this.rational_pts[i], "radius" : 0.5, "colour" : [1, 1, 1, 1]});
 		}
+		if (this.mouse_projective_pos != [0, 0, 0]) {
+			draw_pts.push({"point" : this.mouse_projective_pos, "radius" : 1, "colour" : [0, 0, 0, 1]});
+		}
+		return draw_pts
 	}
 	
 	get_mouse_pos_pixels(evt) {  
@@ -67,6 +72,13 @@ PlaneCanvas = class {
 						
 		this.mouse_projective_pos = pt;
 		*/
+	}
+	
+	update_curves (curves_glsl) {}
+	
+	update_rational_pts(rational_pts)
+	{
+		this.rational_pts = rational_pts;
 	}
 		
 }
@@ -605,6 +617,12 @@ window.CanvasManager = class {
 	update_curves(curves_glsl) {
 		for (var i = 0; i < this.canvases.length; i += 1) {
 			this.canvases[i].update_curves(curves_glsl);
+		}
+	}
+	
+	update_rational_pts(rational_pts) {
+		for (var i = 0; i < this.canvases.length; i += 1) {
+			this.canvases[i].update_rational_pts(rational_pts);
 		}
 	}
 }

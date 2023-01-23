@@ -60,6 +60,9 @@ class Rational(Message):
         assert type(frac) == Fraction
         self.frac = frac
 
+    def to_frac(self):
+        return self.frac
+
     def to_string(self):
         if self.frac.denominator == 1:
             return str(self.frac.numerator)
