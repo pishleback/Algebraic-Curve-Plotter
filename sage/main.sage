@@ -51,7 +51,7 @@ while True:
 		if poly_msg.is_zero():
 			raise ErrorMessage("The polynomial should be non-zero")
 		elif len(var_strs) == 0:
-			reply_msg = {"status" : "good", "factors" : []}
+			reply_msg = {"status" : "good", "factors" : [], "rational_points" : []}
 		else:
 			P2, vars = ProjectiveSpace(2, QQ).objgens()
 			R = P2.coordinate_ring()
