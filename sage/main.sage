@@ -10,17 +10,6 @@ socket = context.socket(zmq.REP)
 socket.bind("tcp://0.0.0.0:5555")
 
 
-#R.<x,y,z> = QQ[]
-#poly = x^3 - 3*x^2*y - 3*x^2*z - 3*x*y^2 - 5*x*y*z - 3*x*z^2 + y^3 - 3*y^2*z - 3*y*z^2 + z^3
-#f = EllipticCurve_from_cubic(poly, [-1,0,1], morphism=True);
-#E = f.domain() #emoji problem curve
-#W = f.codomain() #emoji problem curve in weirstrass form
-#P = W.gens()[0] #P is a generator of the free part of the group
-
-
-#print(f([-1, 0, 1]))
-#print(0 * P)
-
 
 
 

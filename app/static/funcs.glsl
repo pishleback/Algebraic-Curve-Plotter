@@ -1,3 +1,5 @@
+#version 100
+
 highp float pi = 3.14159265359;
 
 highp float cosh(highp float x) {
@@ -32,6 +34,6 @@ highp vec3 get_perp(highp vec3 v) {
 	if (v.z < 0.5) {
 		return normalize(cross(v, vec3(0.0, 0.0, 1.0)));
 	} else {
-	  return normalize(cross(v, vec3(0.0, 1.0, 0.0)));
+		return normalize(cross(v, vec3(0.0, 1.0, 0.0)));
 	}
 }

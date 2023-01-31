@@ -7,26 +7,44 @@ app = flask.Flask(__name__)
 turbo = turbo_flask.Turbo()
 turbo.init_app(app)
 
-import redis
-cache = redis.Redis(host='redis', port=6379)
-
 import zmq
 import json
 import messages
 from io import BytesIO
-context = zmq.Context()
+zmq_ctx = zmq.Context()
 
+import secrets
+app.secret_key = secrets.token_hex(32) #used to sign session data in cookies
 
-def get_hit_count():
-    retries = 5
+def make_identity_generator():
+    n : int = 0
     while True:
-        try:
-            return cache.incr('hits')
-        except redis.exceptions.ConnectionError as exc:
-            if retries == 0:
-                raise exc
-            retries -= 1
-            time.sleep(0.1)
+        yield n
+        n += 1
+identity_generator = make_identity_generator()
+del make_identity_generator
+
+
+class SessionManager():
+    def __init__(self):
+        self._next_ident : int = 0
+    
+    def create_identity(self) -> int:
+        new_identity = self._next_ident
+        self._next_ident += 1
+        return new_identity
+
+SESSION_MANAGER = SessionManager()
+del SessionManager
+
+@turbo.user_id
+def get_user_id():
+    import random
+    identity_key = "_identity"
+    if not identity_key in flask.session:
+        flask.session[identity_key] = SESSION_MANAGER.create_identity()
+    return flask.session[identity_key]
+
 
 
 @app.route('/index', methods = ["GET", "POST"])
@@ -55,9 +73,9 @@ def hello():
             warnings.append("Polynomials of high degree may not render correctly.")
         
         curve_mj = curve_msg.to_mathjax()
-        curve_disp = r"\[" + curve_mj + r" = 0\]"
+        curve_disp = R"\[" + curve_mj + R" = 0\]"
 
-        socket = context.socket(zmq.REQ)
+        socket = zmq_ctx.socket(zmq.REQ)
         socket.connect("tcp://sage:5555")
         socket.send(json.dumps({"polynomial" : curve_msg.to_json()}).encode("utf-8"))
         msg = json.loads(socket.recv().decode("utf-8"))
@@ -74,7 +92,7 @@ def hello():
         rational_pts = [[float(messages.Rational.from_json(pt[i]).to_frac()) for i in range(3)] for pt in msg["rational_points"]]
 
         curve_disp = ""
-        curve_disp += r"\["
+        curve_disp += R"\["
         if len(factors) == 0:
             curve_disp += "1"
         else:
@@ -82,18 +100,17 @@ def hello():
                 if factor.num_terms() == 1 or (len(factors) == 1 and power == 1):
                     curve_disp += factor.to_mathjax()
                 else:
-                    curve_disp += r"\left(" + factor.to_mathjax() + r"\right)"
+                    curve_disp += R"\left(" + factor.to_mathjax() + R"\right)"
                 if power > 1:
-                    curve_disp += "^{" + str(power) + r"}"
-        curve_disp += r"=0\]"
+                    curve_disp += "^{" + str(power) + R"}"
+        curve_disp += R"=0\]"
     
     except messages.ParseError:
         curve_disp = None
         curve_glsls = []
         rational_pts = []
     
-    ans = flask.render_template('hello.html',
-                                count = get_hit_count(),
+    ans = flask.render_template('main.html',
                                 curve_input = curve_str,
                                 curve_disp = curve_disp,
                                 warnings = warnings,
@@ -107,25 +124,10 @@ def hello():
 
 
 
-@app.route('/edit')
-def edit():
-    return flask.render_template("edit.html")
-        
 
 
 
 
 
 
-
-
-
-
-
-
-
-
-
-
-    
 

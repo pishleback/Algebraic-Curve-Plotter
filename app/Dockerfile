@@ -2,11 +2,11 @@
 FROM python:3.10
 WORKDIR /code
 EXPOSE 5000
-COPY ./app/requirements.txt ./requirements.txt
 RUN apt-get update
 RUN apt-get -y install gcc musl-dev
 RUN apt-get -y install npm
 RUN pip install --upgrade pip
+COPY ./app/requirements.txt ./requirements.txt
 RUN pip install -r ./requirements.txt
 RUN npm install regl quaternion brfs
 RUN npm install -g browserify
