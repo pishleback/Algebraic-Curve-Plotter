@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <meta charset="UTF-8">
-<title>Page Title</title>
+<title>Curve Plotter</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="stylesheet" href="https://www.w3schools.com/w3css/4/w3.css">
 
@@ -15,13 +15,12 @@
 
 <script type="text/javascript" id="MathJax-script" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
 
-<turbo-frame id="ec_params">
+<turbo-frame id="polynomial_input">
 	<form action="{{ url_for('hello') }}" method="post"> <!-- set data-turbo="false" to dissable turbo loading-->
 		<div class="w3-container w3-light-grey">
 			<p>
 			<h2>Inputs</h2>
-			<p>Enter a
- smooth cubic curve and coordinates of a base point.</p>
+			<p>Enter a smooth cubic curve and coordinates of a base point.</p>
 			<label class="w3-container w3-center">Curve
 			<input id="curve-input" 
 				   class="w3-input w3-border"
@@ -55,16 +54,15 @@
 	//wait for window.canvas_manager to load, then set the curves to display
 	function update_curves() {
 		if (typeof window.canvas_manager !== "undefined"){
-			window.canvas_manager.update_curves({{ curve_glsls | tojson }})
-			window.canvas_manager.update_rational_pts({{ rational_pts | tojson }})
+			window.canvas_manager.update_curves({{ curve_info | tojson }})
 		} else {
 			setTimeout(update_curves, 250);
 		}
 	}
 	update_curves();
 	</script>
-</turbo-frame id="ec_params">
-
+	{% include "rational_points.html" %}
+</turbo-frame id="polynomial_input">
 
 
 
@@ -82,14 +80,14 @@
 	<div class="w3-card-4 w3-blue">
 		<h2 class="w3-container w3-center">Affine Plane \(\mathbb{A}_\mathbb{R}^2\)</h2>
 		<div class="w3-container">
-			<canvas id="affine-canvas" width=1200 height=1200 style="max-width:100%;"/>
+			<canvas id="affine-canvas" width=1200 height=1200 style="max-width:100%;">
 		</div>
 		<p class="w3-container">Mousewheel to move around.</p>
 	</div> 
 	<div class="w3-card-4 w3-blue">
 		<h2 class="w3-container w3-center">Projective Plane \(\mathbb{P}_\mathbb{R}^2\)</h2>
 		<div class="w3-container">
-			<canvas id="projective-canvas" width=1200 height=1200 style="max-width:100%;"/>
+			<canvas id="projective-canvas" width=1200 height=1200 style="max-width:100%;">
 		</div>
 		<p class="w3-container">Click and drag to move around.</p>
 		<form action="" method="post">

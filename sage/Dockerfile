@@ -6,5 +6,6 @@ RUN sage --pip install --upgrade pip
 RUN sage --pip install -r ./requirements.txt
 COPY ./sage .
 COPY ./messages.py .
+COPY ./sage_messages.py .
 ENV PYTHONUNBUFFERED=1
 CMD ["sage", "main.sage"]

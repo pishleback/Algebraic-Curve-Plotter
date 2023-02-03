@@ -18,14 +18,14 @@ PlaneCanvas = class {
 	constructor(canvas) {
 		this.canvas = canvas;
 		this.mouse_projective_pos = [0, 0, 0];
-		this.rational_pts = [];
+		this.rational_pt_info = [];
 	}
 	
 	get_draw_points() {
 		var draw_pts = []
-		for (var i = 0; i < this.rational_pts.length; i += 1) {
-			draw_pts.push({"point" : this.rational_pts[i], "radius" : 1, "colour" : [1, 0, 0, 1]});
-			draw_pts.push({"point" : this.rational_pts[i], "radius" : 0.5, "colour" : [1, 1, 1, 1]});
+		for (var i = 0; i < this.rational_pt_info.length; i += 1) {
+			draw_pts.push({"point" : this.rational_pt_info[i]["pt"], "radius" : 1, "colour" : this.rational_pt_info[i]["colour"].concat([1])});
+			draw_pts.push({"point" : this.rational_pt_info[i]["pt"], "radius" : 0.5, "colour" : [1, 1, 1, 1]});
 		}
 		if (this.mouse_projective_pos != [0, 0, 0]) {
 			draw_pts.push({"point" : this.mouse_projective_pos, "radius" : 1, "colour" : [0, 0, 0, 1]});
@@ -74,11 +74,15 @@ PlaneCanvas = class {
 		*/
 	}
 	
-	update_curves (curves_glsl) {}
+	update_curves(curve_info) {
+		// curve_info should be a list of dics, each dict contains:
+		// "glsl" : a string to be evaluated by glsl for evaluation. Should be a function in x, y, z
+		// "colour" : a list of [r, g, b] values for the colour of the curve
+	}
 	
-	update_rational_pts(rational_pts)
+	update_rational_pts(rational_pt_info)
 	{
-		this.rational_pts = rational_pts;
+		this.rational_pt_info = rational_pt_info;
 	}
 		
 }
@@ -264,9 +268,9 @@ window.AffineCanvas = class extends PlaneCanvas {
 	}
 
 	
-	update_curves (curves_glsl) {		
+	update_curves(curve_info) {		
 		this.draw_curves = [];
-		for (var i = 0; i < curves_glsl.length; i++) {
+		for (var i = 0; i < curve_info.length; i++) {
 			this.draw_curves.push(this.regl({
 				vert: `
 				attribute vec2 u_pos;
@@ -285,9 +289,10 @@ window.AffineCanvas = class extends PlaneCanvas {
 				varying highp vec2 coord;
 				uniform highp float zoom;
 				uniform highp vec2 canvas_size;
+				uniform highp vec3 colour;
 
 				highp float func(highp float x, highp float y, highp float z) {
-					return ` + curves_glsl[i] + `;
+					return ` + curve_info[i]["glsl"] + `;
 				}
 
 				void main () {
@@ -303,7 +308,7 @@ window.AffineCanvas = class extends PlaneCanvas {
 					if (neg_count == 0 || neg_count == 5) {
 						discard;
 					} else {
-						gl_FragColor = vec4(1, 0, 0, 1);
+						gl_FragColor = vec4(colour, 1);
 					}
 				}`,
 
@@ -313,6 +318,7 @@ window.AffineCanvas = class extends PlaneCanvas {
 
 				uniforms: {
 					canvas_size: [this.canvas.width, this.canvas.height],
+					colour : curve_info[i]["colour"],
 					zoom: this.regl.prop('zoom'),
 					center: this.regl.prop('center')
 				},
@@ -481,9 +487,9 @@ window.ProjectiveCanvas = class extends PlaneCanvas {
 		})
 	}
 	
-	update_curves (curves_glsl) {		
+	update_curves(curve_info) {		
 		this.draw_curves = [];
-		for (var i = 0; i < curves_glsl.length; i++) {
+		for (var i = 0; i < curve_info.length; i++) {
 			this.draw_curves.push(this.regl({
 					vert: `
 					attribute vec2 u_pos;
@@ -497,12 +503,13 @@ window.ProjectiveCanvas = class extends PlaneCanvas {
 					frag: fs.readFileSync(__dirname + "/funcs.glsl", "utf8") + `
 					varying highp vec2 pos;
 					uniform highp mat3 angle;
+					uniform highp vec3 colour;
 
 					highp float func(highp vec3 v) {
 					  highp float x = v.x;
 					  highp float y = v.y;
 					  highp float z = v.z;
-					  return ` + curves_glsl[i] + `;
+					  return ` + curve_info[i]["glsl"] + `;
 					}
 
 					void main () {
@@ -539,7 +546,7 @@ window.ProjectiveCanvas = class extends PlaneCanvas {
 					if (neg_count == 0 || neg_count == 5) {
 						discard;
 					} else {
-						gl_FragColor = vec4(1, 0, 0, 1);
+						gl_FragColor = vec4(colour, 1);
 					}
 						
 				}`,
@@ -550,6 +557,7 @@ window.ProjectiveCanvas = class extends PlaneCanvas {
 
 				uniforms: {
 				canvas_size: [this.canvas.width, this.canvas.height],
+				colour: curve_info[i]["colour"],
 				angle: this.regl.prop('angle'),
 				},
 
@@ -614,15 +622,15 @@ window.CanvasManager = class {
 		}
 	}
 	
-	update_curves(curves_glsl) {
+	update_curves(curve_info) {
 		for (var i = 0; i < this.canvases.length; i += 1) {
-			this.canvases[i].update_curves(curves_glsl);
+			this.canvases[i].update_curves(curve_info);
 		}
 	}
 	
-	update_rational_pts(rational_pts) {
+	update_rational_pts(rational_pt_info) {
 		for (var i = 0; i < this.canvases.length; i += 1) {
-			this.canvases[i].update_rational_pts(rational_pts);
+			this.canvases[i].update_rational_pts(rational_pt_info);
 		}
 	}
 }

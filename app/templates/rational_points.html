@@ -1,0 +1,13 @@
+<turbo-frame id="rational_points_tf">
+	<script>
+	//wait for window.canvas_manager to load, then set the rational points to display
+	function update_curves() {
+		if (typeof window.canvas_manager !== "undefined"){
+			window.canvas_manager.update_rational_pts({{ rational_pt_info | tojson }})
+		} else {
+			setTimeout(update_curves, 250);
+		}
+	}
+	update_curves();
+	</script>
+</turbo-frame id="rational_points_tf">
