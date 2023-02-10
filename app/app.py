@@ -10,40 +10,33 @@ turbo.init_app(app)
 
 import zmq
 import json
+import threading
+import time
 import messages
 import sage_messages
 from io import BytesIO
 zmq_ctx = zmq.Context()
 
+import redis
+database = redis.Redis(host="redis", port=6379)
+
 import secrets
-app.secret_key = "95739513cd1b289695c843cc62d2bac4fa2cc3e038ddf186124a867e01adbea6" #secrets.token_hex(32) #used to sign session data in cookies
+if not "session_secret_key" in database:
+    database["session_secret_key"] = secrets.token_hex(32)
+    database["session_next_ident"] = 0
+app.secret_key = database["session_secret_key"]
+assert "session_next_ident" in database
 
-def make_identity_generator():
-    n : int = 0
-    while True:
-        yield n
-        n += 1
-identity_generator = make_identity_generator()
-del make_identity_generator
 
-class SessionManager():
-    def __init__(self):
-        self._next_ident : int = 0
-    
-    def create_identity(self) -> int:
-        new_identity = self._next_ident
-        self._next_ident += 1
-        return new_identity
-
-SESSION_MANAGER = SessionManager()
-del SessionManager
 
 @turbo.user_id
 def get_user_id():
     import random
     identity_key = "_identity"
     if not identity_key in flask.session:
-        flask.session[identity_key] = SESSION_MANAGER.create_identity()
+        ident = int(database["session_next_ident"])
+        database["session_next_ident"] = ident + 1
+        flask.session[identity_key] = ident
     return flask.session[identity_key]
 
 
@@ -98,7 +91,7 @@ def hello():
         for idx, poly in enumerate(polys):
             socket = zmq_ctx.socket(zmq.REQ)
             socket.connect("tcp://sage:5555")
-            socket.send(json.dumps({"command" : "default", "params" : {"polynomial" : poly.to_json()}}).encode("utf-8"))
+            socket.send(json.dumps({"command" : "default", "params" : {"polynomial" : poly.to_json(), "user_id" : get_user_id()}}).encode("utf-8"))
             msg = json.loads(socket.recv().decode("utf-8"))
 
             if msg["status"] == "fatal_error":
@@ -129,3 +122,56 @@ def hello():
     print("get_user_id", get_user_id())
 
     return ans
+
+
+
+
+@app.before_first_request
+def before_first_request():
+    def progress_update():
+        import random
+        
+        with app.app_context():
+            socket = zmq_ctx.socket(zmq.REP)
+            socket.bind("tcp://0.0.0.0:5556")
+
+            to_sends = {}
+
+            while True:
+                msg = json.loads(socket.recv().decode("utf-8"))
+                socket.send(b"")
+
+                if not msg["user_id"] in to_sends:
+                    to_sends[msg["user_id"]] = {"t" : time.time(), "msgs" : []}
+                to_sends[msg["user_id"]]["msgs"].append(msg)
+
+                for user_id, info in list(to_sends.items()):
+                    t = info["t"]
+                    msgs = info["msgs"]
+                    new_msgs = []
+                    if time.time() - t < 5:
+                        #client is not to be deemed dead yet
+
+                        for msg in msgs:
+                            try:
+                                if msg["command"] == "clear":
+                                    turbo.push(turbo.replace(flask.render_template('clear_rational_points.html'), "rational_points_tf"), to=msg["user_id"])
+                                elif msg["command"] == "add":
+                                    turbo.push(turbo.replace(flask.render_template('rational_points.html', rational_pt_info=[msg["rational_point"]]), "rational_points_tf"), to=msg["user_id"])
+                                else:
+                                    assert False
+                            except KeyError:
+                                #not currently connected to client
+                                new_msgs.append(msg)
+
+                        info["new_msgs"] = new_msgs
+                        
+                        if len(new_msgs) == 0:
+                            del to_sends[user_id]
+                        else:
+                            info["new_msgs"] = new_msgs
+                                
+                    else:
+                        print("dead client, idk what to do nowwwwwwww")
+
+    threading.Thread(target=progress_update).start()

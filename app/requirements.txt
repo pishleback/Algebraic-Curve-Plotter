@@ -2,3 +2,4 @@ flask
 turbo-flask
 pyzmq
 distinctipy
+redis

@@ -84,6 +84,11 @@ PlaneCanvas = class {
 	{
 		this.rational_pt_info = rational_pt_info;
 	}
+
+	add_rational_pts(rational_pt_info)
+	{
+		this.rational_pt_info = this.rational_pt_info.concat(rational_pt_info);
+	}
 		
 }
 
@@ -631,6 +636,12 @@ window.CanvasManager = class {
 	update_rational_pts(rational_pt_info) {
 		for (var i = 0; i < this.canvases.length; i += 1) {
 			this.canvases[i].update_rational_pts(rational_pt_info);
+		}
+	}
+
+	add_rational_pts(rational_pt_info) {
+		for (var i = 0; i < this.canvases.length; i += 1) {
+			this.canvases[i].add_rational_pts(rational_pt_info);
 		}
 	}
 }
